@@ -4,7 +4,7 @@
 #include <vector>
 
 Client::Client(){
-   recBinary = new char[DATA_SIZE];
+   recBinary = NULL;
    recSizeInBytes = 0;
    initWinsock();
    initSocket();
@@ -25,15 +25,15 @@ Client::~Client(){
 
 //CODE SUPPLIED BY ED
 void Client::start(){
-   int nDataLength2 = recv(Socket, (char*)(&recSizeInBytes), sizeof(_Uint32t), 0);
+   int nDataLength2 = recv(Socket, (char*)(&recSizeInBytes), sizeof(uint32_t), 0);
    recBinary = new char[recSizeInBytes];
    int nDataLength1 = recv(Socket, recBinary, recSizeInBytes, 0);
 
 
 
    //RECEIVE EXTENSION LENGTH
-   _Uint32t recLength;
-   int nDataLength3 = recv(Socket, (char*)(&recLength), sizeof(_Uint32t), 0);
+   uint32_t recLength;
+   int nDataLength3 = recv(Socket, (char*)(&recLength), sizeof(uint32_t), 0);
    extensionLength = ntohl(recLength);
 
    //receive actual extension
@@ -51,6 +51,11 @@ void Client::start(){
    }
 
    close();
+
+   //free up allocated memory
+   delete[] temp;
+   delete[] fileExtension;
+
 }
 
 void Client::close(){
@@ -107,7 +112,7 @@ char* Client::getBinary(){
    return recBinary;
 }
 
-_Uint32t Client::getSizeInBytes(){
+uint32_t Client::getSizeInBytes(){
    return recSizeInBytes;
 }
 

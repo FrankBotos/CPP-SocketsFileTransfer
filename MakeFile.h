@@ -2,9 +2,10 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <stdint.h>
 
 class MakeFile{
 public:
-   MakeFile(_Uint32t sizeInBytes, char* binaryData, std::vector<char> extension);
-   ~MakeFile();
+   MakeFile(uint32_t sizeInBytes, char* binaryData, std::vector<char> extension);
+   virtual ~MakeFile();
 };

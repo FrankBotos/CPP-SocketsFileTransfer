@@ -12,7 +12,7 @@ private:
    string fileType;//this stores the file extension (eg, if the file being saved is a .jpg, this variable will contain .jpg)
 public:
    SaveFile();
-   ~SaveFile();
+   virtual ~SaveFile();
 
    streampos getSize();
    char* getMemBlock();

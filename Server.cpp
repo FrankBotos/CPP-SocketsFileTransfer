@@ -1,5 +1,6 @@
 #include <iostream>
 #include "Server.h"
+#include <stdint.h>
 
 Server::Server(){
    initWinsock();
@@ -77,7 +78,7 @@ void Server::start(SaveFile f){
 
    //retreiving data to be sent
    char* retData1 = f.getMemBlock();
-   _Uint32t fileSize = f.getSize();
+   uint32_t fileSize = f.getSize();
    std::string s = std::to_string(fileSize);
    char const* retData2 = s.c_str();
 
@@ -91,8 +92,8 @@ void Server::start(SaveFile f){
 
 
    //SEND EXTENSION LENGTH
-   _Uint32t extensionLength = htonl(strlen(f.getExtension()));
-   send(Socket, (const char*)(&extensionLength), sizeof(_Uint32t), 0);
+   uint32_t extensionLength = htonl(strlen(f.getExtension()));
+   send(Socket, (const char*)(&extensionLength), sizeof(uint32_t), 0);
    //SEND ACTUAL EXTENSION
    const char* extension = f.getExtension();
    send(Socket, extension, strlen(extension), 0);

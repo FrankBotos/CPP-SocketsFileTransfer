@@ -15,7 +15,7 @@ private:
    SOCKADDR_IN serverInfo;
 public:
    Server();
-   ~Server();
+   virtual ~Server();
 
    void start(SaveFile f);
    void close();
