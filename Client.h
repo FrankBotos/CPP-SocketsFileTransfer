@@ -33,4 +33,6 @@ public:
    uint32_t getSizeInBytes();
    std::vector<char> getExtension();
 
+   void receiveData();
+
 };

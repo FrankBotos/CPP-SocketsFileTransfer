@@ -25,37 +25,8 @@ Client::~Client(){
 
 //CODE SUPPLIED BY ED
 void Client::start(){
-   int nDataLength2 = recv(Socket, (char*)(&recSizeInBytes), sizeof(uint32_t), 0);
-   recBinary = new char[recSizeInBytes];
-   int nDataLength1 = recv(Socket, recBinary, recSizeInBytes, 0);
-
-
-
-   //RECEIVE EXTENSION LENGTH
-   uint32_t recLength;
-   int nDataLength3 = recv(Socket, (char*)(&recLength), sizeof(uint32_t), 0);
-   extensionLength = ntohl(recLength);
-
-   //receive actual extension
-   char* temp = new char[extensionLength];
-   recv(Socket, temp, strlen(temp), 0);
-
-   //std::vector<char> eVec;
-   for (int i = 0; i < extensionLength; i++){
-      eVec.push_back(temp[i]);
-   }
-
-   char* fileExtension = new char[eVec.size()];
-   for (int i = 0; i < eVec.size(); i++){
-      std::cout << eVec[i];
-   }
-
+   receiveData();
    close();
-
-   //free up allocated memory
-   delete[] temp;
-   delete[] fileExtension;
-
 }
 
 void Client::close(){
@@ -118,4 +89,51 @@ uint32_t Client::getSizeInBytes(){
 
 std::vector<char> Client::getExtension(){
    return eVec;
+}
+
+void Client::receiveData(){
+   /* STEPS
+   1. receive size of file in bytes
+   2. receive file extension length,
+   3. then receive actual extension
+   4. while loop to receive entire file
+   */
+
+   //1.Recieive file size in bytes
+   recv(Socket, (char*)(&recSizeInBytes), sizeof(uint32_t), 0);
+
+   //2.Receive file extension length
+   uint32_t recLength;
+   recv(Socket, (char*)(&recLength), sizeof(uint32_t), 0);
+   extensionLength = ntohl(recLength);
+
+   //3.Receive actual extension
+   char* temp = new char[extensionLength];
+   recv(Socket, temp, strlen(temp), 0);
+   for (int i = 0; i < extensionLength; i++){
+      eVec.push_back(temp[i]);
+   }
+   char* fileExtension = new char[eVec.size()];
+   for (int i = 0; i < eVec.size(); i++){
+      std::cout << eVec[i];
+   }
+
+   //4.a while loop to receive data!
+   recBinary = new char[recSizeInBytes];
+   uint32_t totalBytesReceived = 0;
+   uint32_t n = 0;
+
+   while (totalBytesReceived < recSizeInBytes){
+      n = recv(Socket, recBinary + totalBytesReceived, recSizeInBytes, 0);
+      if (n == -1) { break; }
+      totalBytesReceived += n;
+      std::cout << "\r" << totalBytesReceived / 1000000 << "/" << recSizeInBytes / 1000000 << " MB received.";//divide by a million to find MB value
+   }
+   std::cout << "\r" << totalBytesReceived / 1000000 << "/" << recSizeInBytes / 1000000 << " MB received.";
+
+
+   //finally, clean up dynamic memory
+   delete[] temp;
+   delete[] fileExtension;
+
 }

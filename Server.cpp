@@ -76,27 +76,7 @@ void Server::start(SaveFile f){
 
    std::cout << "\n\nClient has connected!\n\n";
 
-   //retreiving data to be sent
-   char* retData1 = f.getMemBlock();
-   uint32_t fileSize = f.getSize();
-   std::string s = std::to_string(fileSize);
-   char const* retData2 = s.c_str();
-
-   std::cout << fileSize << std::endl;
-   std::cout << retData2;
-
-   //sending data
-   send(Socket, (char*)&fileSize, sizeof(fileSize), 0);
-   send(Socket, retData1, fileSize, 0);
-
-
-
-   //SEND EXTENSION LENGTH
-   uint32_t extensionLength = htonl(strlen(f.getExtension()));
-   send(Socket, (const char*)(&extensionLength), sizeof(uint32_t), 0);
-   //SEND ACTUAL EXTENSION
-   const char* extension = f.getExtension();
-   send(Socket, extension, strlen(extension), 0);
+   sendData(f);
 
    close();
 }
@@ -105,4 +85,41 @@ void Server::close(){
    shutdown(Socket, SD_SEND);
    closesocket(Socket);
    WSACleanup();
+}
+
+void Server::sendData(SaveFile f){
+   /* STEPS
+   1. send size of file in bytes
+   2. send file extension length, 
+   3. then send actual extension
+   4. while loop to make sure all of file is sent
+   */
+
+   //1. send the size of the file
+   uint32_t fileSizeInBytes = f.getSize();
+   send(Socket, (char*)&fileSizeInBytes, sizeof(fileSizeInBytes), 0);
+   
+   //2. send the file extension length
+   uint32_t extensionLength = htonl(strlen(f.getExtension()));
+   send(Socket, (const char*)(&extensionLength), sizeof(uint32_t), 0);
+
+   //3. send actual file extension as c-style string
+   const char* extension = f.getExtension();
+   send(Socket, extension, strlen(extension), 0);
+
+   //4. while loop to send all data in file
+   const char* fileInBinary = f.getMemBlock();
+   uint32_t totalBytesSent = 0;
+   uint32_t bytesLeft = fileSizeInBytes;
+   int n;
+   
+   while (totalBytesSent < bytesLeft){
+      n = send(Socket, fileInBinary + totalBytesSent, bytesLeft, 0);
+      if (n == -1) { break; }
+      totalBytesSent += n;
+      bytesLeft -= n;
+      std::cout << "\r" << totalBytesSent / 1000000 << "/" << fileSizeInBytes / 1000000 << " MB sent.";//divide by a million to find MB value
+   }
+   std::cout << "Data transfer complete... ERROR CODE (-1 means transfer failed!): " << n << std::endl;
+
 }

@@ -3,7 +3,6 @@
 #include <string>
 #include <sstream>
 #include "SaveFile.h";
-
 #include "winsock2.h"
 #pragma comment(lib, "ws2_32.lib")
 
@@ -22,5 +21,7 @@ public:
 
    int initWinsock();
    int initSocket();
+
+   void sendData(SaveFile f);
 
 };

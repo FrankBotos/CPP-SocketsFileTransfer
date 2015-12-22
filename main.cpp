@@ -35,5 +35,8 @@ int main(){
       std::cout << "TO BE IMPLEMENTED\n";
    }
 
+   int x;
+   std::cout << "enter 1 to exit...";
+   std::cin >> x;
    return 0;
 }
