@@ -1,12 +1,13 @@
-#include <iostream>
 #include "Server.h"
 #include <stdint.h>
+#include <iostream>
+#include <sstream>
 
 Server::Server(){
    initWinsock();
    initSocket();
+   start();
 }
-
 Server::~Server(){}
 
 int Server::initWinsock(){
@@ -37,35 +38,12 @@ int Server::initSocket(){
    return 0;
 }
 
-//OLD NON WORKING CODE - FOR COMPARISON/LEARNING PURPOSES
-//void Server::start(SaveFile f){
-//   listen(Socket, 1);
-//   SOCKET tempSocket = SOCKET_ERROR;
-//   while (tempSocket == SOCKET_ERROR){
-//      std::cout << "Waiting for incoming connections...\n";
-//      tempSocket = accept(Socket, NULL, NULL);
-//   }
-//   Socket = tempSocket;
-//
-//   std::cout << "\n\nClient has connected!\n\n";
-//
-//   //retreiving data to be sent
-//   char* retData1 = f.getMemBlock();
-//   _Uint32t fileSize = f.getSize();
-//   std::string s = std::to_string(fileSize);
-//   char const* retData2 = s.c_str();
-//
-//   std::cout << fileSize << std::endl;
-//   std::cout << retData2;
-//
-//   //sending data
-//   send(Socket, (char*)&fileSize, sizeof(fileSize), 0);
-//   send(Socket, retData1, fileSize, 0);
-//   close();
-//}
+void Server::start(){
+   FileCopier f;
+   f.setIFileName();
+   f.findFileSize();
+   f.findNumChunks();
 
-//CODE SUPPLIED BY ED
-void Server::start(SaveFile f){
    listen(Socket, 1);
    SOCKET tempSocket = SOCKET_ERROR;
    while (tempSocket == SOCKET_ERROR){
@@ -73,9 +51,9 @@ void Server::start(SaveFile f){
       tempSocket = accept(Socket, NULL, NULL);
    }
    Socket = tempSocket;
-
    std::cout << "\n\nClient has connected!\n\n";
 
+   //WE WILL SEND DATA RIGHT HERE
    sendData(f);
 
    close();
@@ -87,39 +65,74 @@ void Server::close(){
    WSACleanup();
 }
 
-void Server::sendData(SaveFile f){
+void Server::sendData(FileCopier& f){
    /* STEPS
    1. send size of file in bytes
-   2. send file extension length, 
-   3. then send actual extension
-   4. while loop to make sure all of file is sent
+   2. send file extension length
+   3. send actual extension
+   4. break up data into chunks, send each chunk one by one, until no more chunks remain
    */
 
-   //1. send the size of the file
-   uint32_t fileSizeInBytes = f.getSize();
-   send(Socket, (char*)&fileSizeInBytes, sizeof(fileSizeInBytes), 0);
-   
-   //2. send the file extension length
-   uint32_t extensionLength = htonl(strlen(f.getExtension()));
-   send(Socket, (const char*)(&extensionLength), sizeof(uint32_t), 0);
+   //1. send size of file in bytes
+   uint32_t fileSize = f.getSize();
+   uint32_t bytesSent = 0;
 
-   //3. send actual file extension as c-style string
-   const char* extension = f.getExtension();
-   send(Socket, extension, strlen(extension), 0);
-
-   //4. while loop to send all data in file
-   const char* fileInBinary = f.getMemBlock();
-   uint32_t totalBytesSent = 0;
-   uint32_t bytesLeft = fileSizeInBytes;
-   int n;
-   
-   while (totalBytesSent < bytesLeft){
-      n = send(Socket, fileInBinary + totalBytesSent, bytesLeft, 0);
-      if (n == -1) { break; }
-      totalBytesSent += n;
-      bytesLeft -= n;
-      std::cout << "\r" << totalBytesSent / 1000000 << "/" << fileSizeInBytes / 1000000 << " MB sent.";//divide by a million to find MB value
+   std::cout << "Sending filesize... ";
+   while (bytesSent != sizeof(fileSize)){
+      bytesSent = send(Socket, (char*)(&fileSize), sizeof(fileSize), 0);
+      if (bytesSent == sizeof(fileSize)){
+         std::cout << "--->Filesize successfully sent!\n";
+      }
    }
-   std::cout << "Data transfer complete... ERROR CODE (-1 means transfer failed!): " << n << std::endl;
+
+   //2. send file extension length
+   uint32_t extensionLength = strlen(f.getExtension());
+   bytesSent = 0;//reset variable for use with next send
+
+   std::cout << "Sending file extension length... ";
+   while (bytesSent != sizeof(extensionLength)){
+      bytesSent = send(Socket, (char*)(&extensionLength), sizeof(extensionLength), 0);
+      if (bytesSent == sizeof(extensionLength)){
+         std::cout << "--->File extension length successfuly sent!\n";
+      }
+   }
+
+   //3. send actual extension as c-style string!
+   const char* extension = f.getExtension();
+   bytesSent = 0;
+
+   std::cout << "Sending file extension... ";
+   while (bytesSent != sizeof(extension)){
+      bytesSent = send(Socket, extension, sizeof(extension), 0);
+      if (bytesSent == sizeof(extension)){
+         std::cout << "--->File extension successfully sent!\n";
+      }
+   }
+
+   //4. send data in chunks
+
+   //send one chunk at a time, until all chunks sent
+   //for last chunk, we can simply ignore extra data and parse on client side (this makes for simpler code on both ends)
+   uint32_t chunksSent = 0;
+   while (chunksSent <= f.getNumChunks()){
+      char* currentChunk = new char[f.getChunkSize()];
+      f.readChunk(currentChunk, f.getChunkSize());
+      uint32_t numBytesSent = 0;
+      uint32_t numBytesLeft = f.getChunkSize();
+      uint32_t n;
+
+      while (numBytesSent < numBytesLeft) {
+         n = send(Socket, currentChunk + numBytesSent, numBytesLeft, 0);
+         if (n > 0){
+            numBytesSent += n;
+            numBytesLeft -= n;
+            std::cout << "\rSENT ->" << numBytesSent << "/" << f.getChunkSize();
+         }
+      }
+      delete[] currentChunk;
+      std::cout << " ----- CHUNKS SENT: " << chunksSent;
+      chunksSent++;
+      std::cout << std::endl;
+   }
 
 }

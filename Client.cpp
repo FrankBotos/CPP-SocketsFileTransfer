@@ -1,39 +1,17 @@
-#include <iostream>
 #include "Client.h"
+#include <iostream>
 #include <string>
-#include <vector>
+#include "FileCopier.h"
+
+using namespace std;
 
 Client::Client(){
-   recBinary = NULL;
    recSizeInBytes = 0;
    initWinsock();
    initSocket();
+   start();
 }
-Client::~Client(){
-   if (recBinary){
-      delete[] recBinary;
-   }
-   recBinary = NULL;
-}
-
-//OLD NON WORKING CODE
-//void Client::start(){
-//   int nDataLength2 = recv(Socket, (char*)(&recData1), sizeof(_Uint32t), 0);
-//   int nDataLength1 = recv(Socket, recData2, DATA_SIZE, 0);
-//   close();
-//}
-
-//CODE SUPPLIED BY ED
-void Client::start(){
-   receiveData();
-   close();
-}
-
-void Client::close(){
-   shutdown(Socket, SD_SEND);
-   closesocket(Socket);
-   WSACleanup();
-}
+Client::~Client(){}
 
 int Client::initWinsock(){
    if (WSAStartup(MAKEWORD(2, 2), &WsaData) != 0){
@@ -43,15 +21,16 @@ int Client::initWinsock(){
    }
    return 0;
 }
-
 int Client::initSocket(){
-
    Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
    if (Socket == INVALID_SOCKET){
       std::cout << "Socket creation failed!\n";
       WSACleanup();
       return 1;
    }
+
+   cout << "Please enter new filename: ";
+   cin >> newFileName;
 
    std::cout << "Please enter server's hostname or IP address: ";
    std::string s;
@@ -76,17 +55,24 @@ int Client::initSocket(){
       return 3;
    }
 
+   std::cout << "\n\nSuccessfuly connected to server at: " << hostName << " : " << portNum << "\n";
+
    return 0;
 }
 
-char* Client::getBinary(){
-   return recBinary;
+void Client::start(){
+   receiveData();
+   close();
+}
+void Client::close(){
+   shutdown(Socket, SD_SEND);
+   closesocket(Socket);
+   WSACleanup();
 }
 
 uint32_t Client::getSizeInBytes(){
    return recSizeInBytes;
 }
-
 std::vector<char> Client::getExtension(){
    return eVec;
 }
@@ -94,46 +80,79 @@ std::vector<char> Client::getExtension(){
 void Client::receiveData(){
    /* STEPS
    1. receive size of file in bytes
-   2. receive file extension length,
-   3. then receive actual extension
-   4. while loop to receive entire file
+   2. receive file extension length
+   3. receive actual extension as c-style string
+   4. receive actual binary data from file
    */
 
-   //1.Recieive file size in bytes
-   recv(Socket, (char*)(&recSizeInBytes), sizeof(uint32_t), 0);
+   //1. receive size of file in bytes
+   uint32_t fileSize = 0;
+   uint32_t bytesReceived = 0;
 
-   //2.Receive file extension length
-   uint32_t recLength;
-   recv(Socket, (char*)(&recLength), sizeof(uint32_t), 0);
-   extensionLength = ntohl(recLength);
-
-   //3.Receive actual extension
-   char* temp = new char[extensionLength];
-   recv(Socket, temp, strlen(temp), 0);
-   for (int i = 0; i < extensionLength; i++){
-      eVec.push_back(temp[i]);
-   }
-   char* fileExtension = new char[eVec.size()];
-   for (int i = 0; i < eVec.size(); i++){
-      std::cout << eVec[i];
+   std::cout << "Receiving filesize... ";
+   while (bytesReceived != sizeof(fileSize)){
+      bytesReceived = recv(Socket, (char*)(&fileSize), sizeof(fileSize), 0);
+      if (bytesReceived == sizeof(fileSize)){
+         std::cout << "--->Filesize successfully received!\n";
+      }
    }
 
-   //4.a while loop to receive data!
-   recBinary = new char[recSizeInBytes];
-   uint32_t totalBytesReceived = 0;
-   uint32_t n = 0;
+   //2. receive file extension length
+   uint32_t extensionLength = 0;
+   bytesReceived = 0;//reset variable for use with next recv
 
-   while (totalBytesReceived < recSizeInBytes){
-      n = recv(Socket, recBinary + totalBytesReceived, recSizeInBytes, 0);
-      if (n == -1) { break; }
-      totalBytesReceived += n;
-      std::cout << "\r" << totalBytesReceived / 1000000 << "/" << recSizeInBytes / 1000000 << " MB received.";//divide by a million to find MB value
+   std::cout << "Receiving file extension length... ";
+   while (bytesReceived != sizeof(fileSize)){
+      bytesReceived = recv(Socket, (char*)(&extensionLength), sizeof(extensionLength), 0);
+      if (bytesReceived == sizeof(extensionLength)){
+         std::cout << "--->File extension length successfully received!\n";
+      }
    }
-   std::cout << "\r" << totalBytesReceived / 1000000 << "/" << recSizeInBytes / 1000000 << " MB received.";
 
+   //3. receive actual extension as c-style string
+   char* extension = new char[extensionLength];
+   bytesReceived = 0;
 
-   //finally, clean up dynamic memory
-   delete[] temp;
-   delete[] fileExtension;
+   std::cout << "Receiving file extension... ";
+   while (bytesReceived != sizeof(extension)){
+      bytesReceived = recv(Socket, extension, sizeof(extension), 0);
+      if (bytesReceived == sizeof(extension)){
+         std::cout << "--->File extension successfully received!\n";
+         extension[extensionLength] = '\0';//null terminating string if extension was successfully received
+      }
+   }
+
+   //4. receive actual data in chunks
+   FileCopier f;
+   f.setOFileName(extension, newFileName);
+
+   //receive one chunk
+   uint32_t chunksReceived = 0;
+   while (chunksReceived <= (fileSize / f.getChunkSize())){
+      char* currentChunk = new char[f.getChunkSize()];
+      uint32_t numBytesReceived = 0;
+      uint32_t n;
+
+      while (numBytesReceived < f.getChunkSize()){
+         n = recv(Socket, currentChunk + numBytesReceived, f.getChunkSize(), 0);
+         if (n > 0){
+            numBytesReceived += n;
+            std::cout << "\rRECEIVED ->" << numBytesReceived << "/" << f.getChunkSize();
+         }
+      }
+
+      if (chunksReceived != (fileSize / f.getChunkSize())){
+         f.writeChunk(currentChunk, numBytesReceived);
+      }
+      else {
+         uint32_t lastChunkSize = fileSize - (f.getChunkSize() * (fileSize / f.getChunkSize()));
+         f.writeChunk(currentChunk, lastChunkSize);
+      }
+      
+      
+      delete[] currentChunk;
+      chunksReceived++;
+      std::cout << std::endl;
+   }
 
 }

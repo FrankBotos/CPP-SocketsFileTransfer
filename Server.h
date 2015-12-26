@@ -1,13 +1,9 @@
 #pragma once
-
-#include <string>
-#include <sstream>
-#include "SaveFile.h";
+#include "FileCopier.h"
 #include "winsock2.h"
 #pragma comment(lib, "ws2_32.lib")
 
 class Server{
-
 private:
    WSADATA WsaData;
    SOCKET Socket;
@@ -16,12 +12,12 @@ public:
    Server();
    virtual ~Server();
 
-   void start(SaveFile f);
-   void close();
-
    int initWinsock();
    int initSocket();
 
-   void sendData(SaveFile f);
+   void start();
+   void close();
+
+   void sendData(FileCopier& f);
 
 };

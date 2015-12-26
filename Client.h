@@ -1,35 +1,32 @@
 #pragma once
-
 #include "winsock2.h"
 #include <vector>
 #include <stdint.h>
 #pragma comment(lib, "ws2_32.lib")
 
 class Client{
-
 private:
    WSADATA WsaData;
    SOCKET Socket;
-   struct hostent * host;
+   struct hostent* host;
    SOCKADDR_IN SockAddress;
 
-   char* recBinary;//this will receive binary info about file RECDATA2
-   uint32_t recSizeInBytes;//this will recieve STREAMPOS var about file ie. represents size of file in bytes RECDATA1
+   uint32_t recSizeInBytes;//total size of sent file in bytes
+   std::vector<char> eVec;//will contain the file extension (a pdf file would mean this var holds ".pdf")
+   uint32_t extensionLength;//will receive the length of the extension in characters
 
-   std::vector<char> eVec;//this will receive actual file extension of received file eg. a pdf file woudld send ".pdf" to this variable
-   uint32_t extensionLength;//this will receive the #of characters taken up by the received file's extension
+   std::string newFileName;//this will locally store whatever the user wants to name new file
 
 public:
    Client();
    virtual ~Client();
 
-   void start();
-   void close();
-
    int initWinsock();
    int initSocket();
 
-   char* getBinary();
+   void start();
+   void close();
+
    uint32_t getSizeInBytes();
    std::vector<char> getExtension();
 
