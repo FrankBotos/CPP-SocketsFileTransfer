@@ -49,6 +49,9 @@ void FileCopier::findFileSize(){
       fileSize = iFile.tellg();//because get pointer is at end of file, this will reveal file size in bytes
       iFile.seekg(0, ios::beg);//resets file pointer to beginning
    }
+   else {
+	   std::cout << "File could not be found!\n";
+   }
 }
 
 void FileCopier::findNumChunks(){

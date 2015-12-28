@@ -128,15 +128,22 @@ void Client::receiveData(){
 
    //receive one chunk
    uint32_t chunksReceived = 0;
+   char* currentChunk = new char[f.getChunkSize()];
+   uint32_t lastChunkSize = fileSize - (f.getChunkSize() * (fileSize / f.getChunkSize()));
+
+   uint32_t allBytesRec = 0;
+
    while (chunksReceived <= (fileSize / f.getChunkSize())){
-      char* currentChunk = new char[f.getChunkSize()];
       uint32_t numBytesReceived = 0;
       uint32_t n;
 
       while (numBytesReceived < f.getChunkSize()){
          n = recv(Socket, currentChunk + numBytesReceived, f.getChunkSize(), 0);
-         if (n > 0){
+         if (n > 0 && n <= f.getChunkSize()){
             numBytesReceived += n;
+
+			allBytesRec += n;
+
             std::cout << "\rRECEIVED ->" << numBytesReceived << "/" << f.getChunkSize();
          }
       }
@@ -145,14 +152,13 @@ void Client::receiveData(){
          f.writeChunk(currentChunk, numBytesReceived);
       }
       else {
-         uint32_t lastChunkSize = fileSize - (f.getChunkSize() * (fileSize / f.getChunkSize()));
          f.writeChunk(currentChunk, lastChunkSize);
       }
       
-      
-      delete[] currentChunk;
       chunksReceived++;
-      std::cout << std::endl;
+      std::cout << "  ------------------->" << allBytesRec / 1000000 << "/" << fileSize / 1000000 << std::endl;
+
    }
+   delete[] currentChunk;
 
 }
