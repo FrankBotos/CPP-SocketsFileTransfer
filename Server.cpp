@@ -115,6 +115,7 @@ void Server::sendData(FileCopier& f){
    //for last chunk, we can simply ignore extra data and parse on client side (this makes for simpler code on both ends)
    uint32_t chunksSent = 0;
    char* currentChunk = new char[f.getChunkSize()];
+   uint32_t totalBytesSent = 0;
 
    while (chunksSent <= f.getNumChunks()){
       f.readChunk(currentChunk, f.getChunkSize());
@@ -127,13 +128,14 @@ void Server::sendData(FileCopier& f){
          if (n > 0 && n <= f.getChunkSize()){
             numBytesSent += n;
             numBytesLeft -= n;
-            std::cout << "\rSENT ->" << numBytesSent << "/" << f.getChunkSize();
+
+			totalBytesSent += n;
+
          }
       }
-      
-      std::cout << " ----- CHUNKS SENT: " << chunksSent;
       chunksSent++;
-      std::cout << std::endl;
+
+	  std::cout << "\rSent: " << totalBytesSent / 1000000 << "/" << fileSize / 1000000 << " MB";
 
    }
    delete[] currentChunk;

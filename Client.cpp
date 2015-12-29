@@ -2,8 +2,8 @@
 #include <iostream>
 #include <string>
 #include "FileCopier.h"
-
-using namespace std;
+#include <chrono>
+#include <iomanip>
 
 Client::Client(){
    recSizeInBytes = 0;
@@ -29,8 +29,8 @@ int Client::initSocket(){
       return 1;
    }
 
-   cout << "Please enter new filename: ";
-   cin >> newFileName;
+   std::cout << "Please enter new filename: ";
+   std::cin >> newFileName;
 
    std::cout << "Please enter server's hostname or IP address: ";
    std::string s;
@@ -126,11 +126,18 @@ void Client::receiveData(){
    FileCopier f;
    f.setOFileName(extension, newFileName);
 
-   //receive one chunk
+		//setting up variables for a basic timer to keep track of megabytes per second
+		auto start = std::chrono::high_resolution_clock::now();
+		auto end = std::chrono::high_resolution_clock::now();
+		uint32_t currentTime = 0;
+		uint32_t currentBytes = 0;
+		uint32_t oldBytes = 0;
+		double MBPS;//will hold final result (megabytes per second)
+
+   //receive one chunk at a time, and write to file
    uint32_t chunksReceived = 0;
    char* currentChunk = new char[f.getChunkSize()];
    uint32_t lastChunkSize = fileSize - (f.getChunkSize() * (fileSize / f.getChunkSize()));
-
    uint32_t allBytesRec = 0;
 
    while (chunksReceived <= (fileSize / f.getChunkSize())){
@@ -141,10 +148,7 @@ void Client::receiveData(){
          n = recv(Socket, currentChunk + numBytesReceived, f.getChunkSize(), 0);
          if (n > 0 && n <= f.getChunkSize()){
             numBytesReceived += n;
-
 			allBytesRec += n;
-
-            std::cout << "\rRECEIVED ->" << numBytesReceived << "/" << f.getChunkSize();
          }
       }
 
@@ -155,10 +159,28 @@ void Client::receiveData(){
          f.writeChunk(currentChunk, lastChunkSize);
       }
       
+	  //if we get to this point, the complete chunk has been received and written, we can increment to next one!
       chunksReceived++;
-      std::cout << "  ------------------->" << allBytesRec / 1000000 << "/" << fileSize / 1000000 << std::endl;
+
+		//update timer!
+		end = std::chrono::high_resolution_clock::now();
+		auto timePassed = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+		//this block will save the amount of bytes downloaded since the last second into "oldBytes"
+		if (currentTime != (int)timePassed.count()) {
+			  currentTime = (int)timePassed.count();
+			  oldBytes = currentBytes;
+			  currentBytes = 0;
+		}
+		else {
+			  currentBytes += n;
+		}
+		MBPS = (double)oldBytes / (double)1000000;//find a ROUGHLY accurate estimation of MBPS
+
+	  //output current status of file transfer
+	  std::cout << "\rReceiving file..." << allBytesRec / 1000000 << "/" << fileSize / 1000000 << "MB" << "(" << std::fixed << std::setprecision(2) << MBPS << " MB/s)";
 
    }
    delete[] currentChunk;
+   std::cout << "--->File successfully received!\n";
 
 }
